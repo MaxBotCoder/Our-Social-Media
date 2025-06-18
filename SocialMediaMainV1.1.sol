@@ -2,7 +2,7 @@
 pragma solidity 0.8.0;
 
 /* This smart contract system was made
- by your's truely MaxBotCoder me/myself/I */
+ by your's truely me/myself/I */
 
 contract SocialMediaMain {
 
@@ -75,12 +75,15 @@ contract SocialMediaMain {
     struct Post {
         string Handle;
         string UserName;
-        string Post;
+        string PostContents;
         string ModerationStatus; //Only Creator, Super Users or Moderators can change this otherwise the status is set to it's default state.
+        uint PersonalPostNumber;
+        uint GlobalPostNumber;
     }
 
     mapping(uint => Post) public PostNumberToPost;
-    mapping(address => mapping(uint => Post)) PersonalPostNumbering;
+    mapping(address => mapping(uint => Post)) public PersonalPostNumbering;
+    mapping(uint => uint) public PersonalPostNumberToGlobalPostNumber;
 
     //Prepair contract info
     constructor(string memory _Handle, string memory _UserName, string memory _About) {
@@ -110,8 +113,19 @@ contract SocialMediaMain {
     }
 
     //Edit account info.
-    function EditAccount() public {
-        
+    function EditAccount(uint _ModificationType, string memory _ModificationData) public {
+        require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
+        require(ValidAccount[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
+        require(_ModificationType == 1 || _ModificationType == 2 || _ModificationType == 3 , "Invalid modification request.");
+
+        if(_ModificationType == 1) {
+            
+        } else if(_ModificationType == 2) {
+            
+        } else if(_ModificationType == 3) {
+            
+        }
+         
     }
 
     //For making posts.
@@ -119,13 +133,14 @@ contract SocialMediaMain {
         require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
         require(ValidAccount[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
         PostNumber++;
-        PersonalPostNumbering[msg.sender][PersonalPostNumber[msg.sender] += 1] = PostNumberToPost[PostNumber] = Post( AddressToHandle[msg.sender], AddressToUserName[msg.sender], _PostContents, "All clear");
+        PersonalPostNumbering[msg.sender][PersonalPostNumber[msg.sender] += 1] = PostNumberToPost[PostNumber] = Post( AddressToHandle[msg.sender], AddressToUserName[msg.sender], _PostContents, "All clear", PersonalPostNumber[msg.sender], PostNumber);
+        PersonalPostNumberToGlobalPostNumber[PersonalPostNumber[msg.sender]] = PostNumber;
     }
 
-    function EditPost ( uint _PostNumber, string memory _PostData) public {
+    function EditPost ( uint _PersonalPostNumber, string memory _PostData) public {
         require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
         require(ValidAccount[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
-
+        PersonalPostNumbering[msg.sender][_PersonalPostNumber] = PostNumberToPost[PersonalPostNumberToGlobalPostNumber[_PersonalPostNumber]] = Post( AddressToHandle[msg.sender], AddressToUserName[msg.sender], _PostData, "All clear", PersonalPostNumber[msg.sender], PostNumber);
     }
 
     function Report () public {
@@ -137,4 +152,4 @@ contract SocialMediaMain {
 
     }
 
-} 
+}
