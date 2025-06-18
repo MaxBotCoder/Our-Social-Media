@@ -119,10 +119,25 @@ contract SocialMediaMain {
         require(_ModificationType == 1 || _ModificationType == 2 || _ModificationType == 3 , "Invalid modification request.");
 
         if(_ModificationType == 1) {
-            
+
+            AddressToPage[msg.sender].Handle = _ModificationData;
+            AccountNumberToPage[AddressToAccountNumber[msg.sender]].Handle = _ModificationData;
+            HandleToPage[AddressToHandle[msg.sender]].Handle = _ModificationData;
+            HandleToAddress[AddressToHandle[msg.sender] = AccountNumberToHandle[AddressToAccountNumber[msg.sender]] = _ModificationData] = msg.sender;
+
         } else if(_ModificationType == 2) {
+
+            AddressToPage[msg.sender].UserName = _ModificationData;
+            AccountNumberToPage[AddressToAccountNumber[msg.sender]].UserName = _ModificationData;
+            HandleToPage[AddressToHandle[msg.sender]].UserName = _ModificationData;
+            AddressToPage[msg.sender].UserName = _ModificationData;
+            AddressToUserName[msg.sender] = AccountNumberToUserName[AddressToAccountNumber[msg.sender]] = HandleToUserName[AddressToHandle[msg.sender]] = _ModificationData;
             
         } else if(_ModificationType == 3) {
+
+            AddressToPage[msg.sender].About = _ModificationData;
+            AccountNumberToPage[AddressToAccountNumber[msg.sender]].About = _ModificationData;
+            HandleToPage[AddressToHandle[msg.sender]].About = _ModificationData;
             
         }
          
