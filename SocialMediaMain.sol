@@ -2,7 +2,7 @@
 pragma solidity 0.8.0;
 
 /* This smart contract system was made
- by your's truely me/myself/I */
+ by your's truely MaxBotCoder me/myself/I */
 
 contract SocialMediaMain {
 
