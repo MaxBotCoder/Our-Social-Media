@@ -4,6 +4,8 @@ COPYWRITE INFO:
 //// JUNE 28TH 2025 ////
 
 version 0.0.1.0 (Pre-Alpha) "Uploaded code for first time to repo."
+
 Version 0.0.1.1 (Pre-Alpha) #FIRST UPDATE "Adding additional verification paramaters."
+
 Version 0.0.1.2 (Pre-Alpha) #FIRST UPDATE "Added account modification features."
 
