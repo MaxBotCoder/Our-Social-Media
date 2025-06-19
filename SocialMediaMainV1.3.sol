@@ -23,9 +23,14 @@ contract SocialMediaMain {
     uint public constant MaximumBanningsPerWeek = 200; //Must be configured before deployement << FAILSAFE >> << UNCHANGEABLE >>
     uint public constant AltSuperUserTermLimits = 18; //Represents the number of weeks an Alt SuperUser can have power
     
+    //Report Session Info
+    uint public ReportSessionNumber;
+    mapping(uint => bool) public ReportVerdictReached; //True = verdict reached. False = verdict not reached.
+    mapping(uint => bool) public ReportVerdict;//True = verdict Guilty. False = verdict not reached yet or innocent please refer to verdict reach bool prior.
+
     //Moderator Voting.
     mapping(address => bool) public ModeratorHasVoted;
-    uint public ModeratorVotingSessionNumber;
+    uint public VotingSessionNumber;
     mapping(uint => bool) public VotingSessionResult;
     mapping(uint => string) public VotingSessionTopic;
 
@@ -46,6 +51,7 @@ contract SocialMediaMain {
     uint public AccountNumber;
     mapping(address => bool) public ValidAccount;
     mapping(address => bool) public Blacklisted;
+    mapping(string => bool) public HandleClaimed;
     mapping(address => uint) public AddressToAccountNumber; //Gets input from msg.sender to equal handletonumber (2)
     mapping(address => string) public AddressToHandle; //Takes in address via handle to address and equates to account numebr to handle (4)
     mapping(address => string) public AddressToUserName; //Takes in user name and equates it to account number to username (7)
@@ -85,6 +91,17 @@ contract SocialMediaMain {
     mapping(address => mapping(uint => Post)) public PersonalPostNumbering;
     mapping(uint => uint) public PersonalPostNumberToGlobalPostNumber;
 
+    //Contrins info related to report created
+    struct ReportTrial {
+        string ReportType;
+        string ReportSubject;
+        string ReportDetails;
+        bool ReportVerdictReached; //Report verdict reached (Please look at this prior to virdict) false = Verdict not reached, true = Verdict reached.
+        bool ReportVerdictResult; //Report verdict true = Guilty, false = Innocent or verdict unreached. (Look at virdict reached first)
+    }
+
+    mapping(uint => ReportTrial) public ReportTrialInstance;
+
     //Prepair contract info
     constructor(string memory _Handle, string memory _UserName, string memory _About) {
         creator = msg.sender;
@@ -95,6 +112,7 @@ contract SocialMediaMain {
         AddressToPage[msg.sender] = ProfilePage( _Handle, _UserName, _About, Clearance[msg.sender]);
         AccountNumberToPage[AddressToAccountNumber[msg.sender]] = ProfilePage( _Handle, _UserName, _About, Clearance[msg.sender]);
         HandleToPage[AddressToHandle[msg.sender]] = ProfilePage( _Handle, _UserName, _About, Clearance[msg.sender]);
+        HandleClaimed[_Handle] = true;
     }
 
     //Create an account
@@ -102,6 +120,7 @@ contract SocialMediaMain {
         require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
         require(msg.sender.balance >= SignUpPrice, "Wallet balance too low to complete transaction. Please check your account balance.");
         require(msg.value == SignUpPrice, "Incorrect quantity of funds sent to complete transaction. Transaction cancelled.");
+        require(HandleClaimed[_Handle] == false, "Could not claim already claimed handle.");
         AccountNumber++;
         ValidAccount[msg.sender] = true;
         Clearance[msg.sender] = "Standard folk";
@@ -109,6 +128,7 @@ contract SocialMediaMain {
         AddressToPage[msg.sender] = ProfilePage( _Handle, _UserName, _About, Clearance[msg.sender]);
         AccountNumberToPage[AddressToAccountNumber[msg.sender]] = ProfilePage( _Handle, _UserName, _About, Clearance[msg.sender]);
         HandleToPage[AddressToHandle[msg.sender]] = ProfilePage( _Handle, _UserName, _About, Clearance[msg.sender]);
+        HandleClaimed[_Handle] = true;
         (msg.sender).call{value: msg.value}("");
     }
 
@@ -117,15 +137,18 @@ contract SocialMediaMain {
         require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
         require(ValidAccount[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
         require(_ModificationType == 1 || _ModificationType == 2 || _ModificationType == 3 , "Invalid modification request.");
+        require(HandleClaimed[_ModificationData] == false, "Could not claim already claimed handle.");
 
-        if(_ModificationType == 1) {
+        if(_ModificationType == 1) { //1 = Handle configuration.
 
+            HandleClaimed[AddressToHandle[msg.sender]] = false;
             AddressToPage[msg.sender].Handle = _ModificationData;
             AccountNumberToPage[AddressToAccountNumber[msg.sender]].Handle = _ModificationData;
             HandleToPage[AddressToHandle[msg.sender]].Handle = _ModificationData;
             HandleToAddress[AddressToHandle[msg.sender] = AccountNumberToHandle[AddressToAccountNumber[msg.sender]] = _ModificationData] = msg.sender;
+            HandleClaimed[_ModificationData] = true;
 
-        } else if(_ModificationType == 2) {
+        } else if(_ModificationType == 2) { //2 = User name configuration.
 
             AddressToPage[msg.sender].UserName = _ModificationData;
             AccountNumberToPage[AddressToAccountNumber[msg.sender]].UserName = _ModificationData;
@@ -133,7 +156,7 @@ contract SocialMediaMain {
             AddressToPage[msg.sender].UserName = _ModificationData;
             AddressToUserName[msg.sender] = AccountNumberToUserName[AddressToAccountNumber[msg.sender]] = HandleToUserName[AddressToHandle[msg.sender]] = _ModificationData;
             
-        } else if(_ModificationType == 3) {
+        } else if(_ModificationType == 3) { //3 = About configuration.
 
             AddressToPage[msg.sender].About = _ModificationData;
             AccountNumberToPage[AddressToAccountNumber[msg.sender]].About = _ModificationData;
@@ -158,8 +181,36 @@ contract SocialMediaMain {
         PersonalPostNumbering[msg.sender][_PersonalPostNumber] = PostNumberToPost[PersonalPostNumberToGlobalPostNumber[_PersonalPostNumber]] = Post( AddressToHandle[msg.sender], AddressToUserName[msg.sender], _PostData, "All clear", PersonalPostNumber[msg.sender], PostNumber);
     }
 
-    function Report () public {
+    function Report (uint _ReportType, string memory _ReportSubject, string memory _ReportDetails) public {
+        require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
+        require(ValidAccount[msg.sender] == true || AltSuperUser[msg.sender] == true || Moderator[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
+        require(_ReportType == 1 || _ReportType == 2 || _ReportType == 3 || _ReportType == 4 || _ReportType == 5, "Invalid report option.");
+        
+        if (_ReportType == 1) { //For reporting posts.
 
+            ReportTrialInstance[ReportSessionNumber++].ReportType = "Post Report";
+            ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
+            ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
+
+        } else if (_ReportType == 2) { //For reporting accounts.
+
+            ReportTrialInstance[ReportSessionNumber++].ReportType = "Account Report";
+            ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
+            ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
+
+        } else if (_ReportType == 3) { //For reporting mods.
+
+            ReportTrialInstance[ReportSessionNumber++].ReportType = "Corrupt or rulebending moderator.";
+            ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
+            ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
+
+        } else if (_ReportType == 4) { //For reporting AltSuperuser.
+
+            ReportTrialInstance[ReportSessionNumber++].ReportType = "Corrupt or rulebending super user.";
+            ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
+            ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
+
+        }
     }
 
 
