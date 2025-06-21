@@ -28,13 +28,8 @@ contract SocialMediaMain {
     mapping(uint => bool) public ReportVerdictReached; //True = verdict reached. False = verdict not reached.
     mapping(uint => bool) public ReportVerdict;//True = verdict Guilty. False = verdict not reached yet or innocent please refer to verdict reach bool prior.
 
-    //Moderator Voting.
+    //Moderation System Related Tasks.
     uint public constant MaxmiumStrikes = 10; //Maximum post reports untill cicked out. //Must be changed prior to deployment.
-    mapping(address => uint) public NumeberOfReportsCollected;
-    mapping(address => bool) public ModeratorHasVoted;
-    uint public VotingSessionNumber;
-    mapping(uint => bool) public VotingSessionResult;
-    mapping(uint => string) public VotingSessionTopic;
 
     //Moderator & AltSuperUser Election Storage
     uint public ElectionNumber;
@@ -45,6 +40,7 @@ contract SocialMediaMain {
     //Post Info
     uint public PostNumber;
     mapping(uint => bool) public PostConfescated;
+    mapping(uint => address) public PostNumeberToAddress;
 
     //Personal Post Info!
     mapping(address => uint) public PersonalPostNumber;
@@ -101,27 +97,43 @@ contract SocialMediaMain {
         uint PostNumberToReport; //Only for posts.
         string ReportSubject;
         string ReportDetails;
-        bool ReportVerdictReached; //Report verdict reached (Please look at this prior to virdict) false = Verdict not reached, true = Verdict reached.
-        bool ReportVerdictResult; //Report verdict true = Guilty, false = Innocent or verdict unreached. (Look at virdict reached first)
+        bool ReportTrialCompleted; //Report verdict reached (Please look at this prior to virdict) false = Verdict not reached, true = Verdict reached.
+        bool ReportVerdictReached; //Report verdict true = Guilty, false = Innocent or verdict unreached. (Look at virdict reached first)
+        uint ReportSeverity;
     }
 
     mapping(uint => ReportTrial) public ReportTrialInstance;
-    mapping(address => mapping(uint => bool)) public PersonalReport;
-    mapping(uint => uint) public ReportInstanceNumber; //Counts number of votes within a report trial.
+    mapping(address => mapping(uint => bool)) public PersonalReport; //What a specific user voted.
+    mapping(uint => uint) public ReportInteractionNumber; //Counts number of vote interactions within a report trial. (GENERAL)
+    mapping(uint => mapping(bool => uint)) public NumberOfReportsInCatagory; //Counts number of votes (CATAGORY) within a report trial.
     mapping(uint => bool) public GlobalReportResultValid; //dictates validity of global report result
     mapping(uint => bool) public GlobalReportResult;
     mapping(uint => mapping(address => mapping(uint => ReportTrial))) public NumberOfVotesForTrialResult;
+    
+    mapping(address => uint) public NumberOfReportsCollected;
+    mapping(address => mapping(uint => bool)) public UserHasVoted;
+    uint public VotingSessionNumber;
+    mapping(uint => bool) public ReportTrialHasBeenCompleted;
+    mapping(uint => bool) public ReportTrialVerdict;
+    mapping(uint => string) public VotingSessionTopic;
 
     //Shows info related to votes
     struct VotingSession {
-
+        string VoteTypeHumanReadable;
+        uint VoteType;
+        uint AddressOfUserToVote; //Only for reporting people.
+        uint PostNumberToVote; //Only for posts.
+        string VoteSubject;
+        string VoteDetails;
+        bool VoteVerdictReached; //Report verdict reached (Please look at this prior to virdict) false = Verdict not reached, true = Verdict reached.
+        bool VoteVerdictResult; //Report verdict true = Guilty, false = Innocent or verdict unreached. (Look at virdict reached first)
     }
 
-    mapping(uint => ReportTrial) public VotingInstance;
+    mapping(uint => VotingSession) public VotingInstance;
     mapping(address => mapping(uint => bool)) public PersonalVote;
     mapping(uint => uint) public VotingInstanceNumber; //Counts number of votes within a report trial.
     mapping(uint => bool) public GlobalVoteResult;
-    mapping(uint => mapping(address => mapping(uint => ReportTrial))) public NumberOfVotesForTrialResult;
+    mapping(uint => mapping(address => mapping(uint => VotingSession))) public NumberOfVotesForResult;
 
     //Prepair contract info
     constructor(string memory _Handle, string memory _UserName, string memory _About) {
@@ -136,7 +148,7 @@ contract SocialMediaMain {
         HandleClaimed[_Handle] = true;
     }
 
-    //Create an account
+     //Create an account
     function CreateAccount (string memory _Handle, string memory _UserName, string memory _About) public payable {
         require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
         require(msg.sender.balance >= SignUpPrice, "Wallet balance too low to complete transaction. Please check your account balance.");
@@ -194,14 +206,17 @@ contract SocialMediaMain {
         PostNumber++;
         PersonalPostNumbering[msg.sender][PersonalPostNumber[msg.sender] += 1] = PostNumberToPost[PostNumber] = Post( AddressToHandle[msg.sender], AddressToUserName[msg.sender], _PostContents, "All clear", PersonalPostNumber[msg.sender], PostNumber);
         PersonalPostNumberToGlobalPostNumber[PersonalPostNumber[msg.sender]] = PostNumber;
+        PostNumeberToAddress[PostNumber] = msg.sender;
     }
 
+    //For editing posts.
     function EditPost ( uint _PersonalPostNumber, string memory _PostData) public {
         require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
         require(ValidAccount[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
         PersonalPostNumbering[msg.sender][_PersonalPostNumber] = PostNumberToPost[PersonalPostNumberToGlobalPostNumber[_PersonalPostNumber]] = Post( AddressToHandle[msg.sender], AddressToUserName[msg.sender], _PostData, "All clear", PersonalPostNumber[msg.sender], PostNumber);
     }
 
+    //For voting normally.
     function VotingPollInteraction (uint _VoteType, uint _VoteSessionNumber, bool _CastVote) public {
         require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
         require(ValidAccount[msg.sender] == true || AltSuperUser[msg.sender] == true || Moderator[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
@@ -214,43 +229,58 @@ contract SocialMediaMain {
         } 
     }
 
+    /*    struct ReportTrial {
+        string ReportTypeHumanReadable;
+        uint ReportType;
+        uint AddressOfUserToReport; //Only for reporting people.
+        uint PostNumberToReport; //Only for posts.
+        string ReportSubject;
+        string ReportDetails;
+        bool ReportVerdictReached; //Report verdict reached (Please look at this prior to virdict) false = Verdict not reached, true = Verdict reached.
+        bool ReportVerdictResult; //Report verdict true = Guilty, false = Innocent or verdict unreached. (Look at virdict reached first)
+        uint ReportSeverity;
+    }
+
+    mapping(uint => ReportTrial) public ReportTrialInstance;
+    mapping(address => mapping(uint => bool)) public PersonalReport;
+    mapping(uint => uint) public ReportInstanceNumber; //Counts number of votes within a report trial. (GENERAL)
+    mapping(uint => mapping(bool => uint)) public NumberOfReportsInCatagory; //Counts number of votes (CATAGORY) within a report trial.
+    mapping(uint => bool) public GlobalReportResultValid; //dictates validity of global report result
+    mapping(uint => bool) public GlobalReportResult;
+    mapping(uint => mapping(address => mapping(uint => ReportTrial))) public NumberOfVotesForTrialResult;
+*/
+
+
     function ReportTrialVoting ( uint _ReportSessionNumber, bool _CastVote) public {
         require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
         require(ValidAccount[msg.sender] == true || AltSuperUser[msg.sender] == true || Moderator[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
-        require(ReportInstanceNumber[_ReportSessionNumber] == 57, "Maximum votes have been reached");
-        PersonalReport[msg.sender][ReportTrialInstance[_ReportSessionNumber]] = _CastVote;
-        GlobalReportResult[ReportInstanceNumber[_ReportSessionNumber] += 1] = _CastVote;
+        require(UserHasVoted[msg.sender][_ReportSessionNumber] == false, "You already voted.");
+        require(ReportInteractionNumber[_ReportSessionNumber] <= 57, "Maximum votes have been reached");
 
-        if(GlobalReportResult[ReportInstanceNumber[_ReportSessionNumber] >= 29] == true) {
-            
-            if (ReportTrialInstance[_ReportSessionNumber].ReportType == 1) { //Post Reports
+        UserHasVoted[msg.sender][_ReportSessionNumber] = true;
+        ReportInteractionNumber[_ReportSessionNumber]++;
+        PersonalReport[msg.sender][_ReportSessionNumber] = true;
+        NumberOfReportsInCatagory[_ReportSessionNumber][PersonalReport[msg.sender][_ReportSessionNumber]]++;
 
+        if(NumberOfReportsInCatagory[_ReportSessionNumber][true] <= 29) {
 
-
-            } else if (ReportTrialInstance[_ReportSessionNumber].ReportType == 2) { //Account Reports
-
-            } else if (ReportTrialInstance[_ReportSessionNumber].ReportType == 3) { //Corrupt Moderator
-
-            } else if (ReportTrialInstance[_ReportSessionNumber].ReportType == 4) { //Corrupt SuperUser
-
-            }
-
+            ReportTrialInstance[_ReportSessionNumber].ReportTrialCompleted = true;
             ReportTrialInstance[_ReportSessionNumber].ReportVerdictReached = true;
-            ReportTrialInstance[_ReportSessionNumber].ReportVerdictResult = true;
             GlobalReportResultValid[_ReportSessionNumber] = true;
             GlobalReportResult[_ReportSessionNumber] = true;
 
-        } else if (GlobalReportResult[ReportInstanceNumber[_ReportSessionNumber] >= 29] == false) {
+        } else if (NumberOfReportsInCatagory[_ReportSessionNumber][false] <= 29) {
 
-            ReportTrialInstance[_ReportSessionNumber].ReportVerdictReached = true;
-            ReportTrialInstance[_ReportSessionNumber].ReportVerdictResult = false;
+            ReportTrialInstance[_ReportSessionNumber].ReportTrialCompleted = true;
+            ReportTrialInstance[_ReportSessionNumber].ReportVerdictReached = false;
             GlobalReportResultValid[_ReportSessionNumber] = true;
             GlobalReportResult[_ReportSessionNumber] = false;
 
         }
+
     }
- 
-    function Report (uint _ReportType, uint _AddressOfPersontoReport, uint _NumberOfPostToReport, string memory _ReportSubject, string memory _ReportDetails) public {
+
+    function Report (uint _ReportType, uint _AddressOfPersontoReport, uint _NumberOfPostToReport, uint _ReportSeverity, string memory _ReportSubject, string memory _ReportDetails) public {
         require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
         require(ValidAccount[msg.sender] == true || AltSuperUser[msg.sender] == true || Moderator[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
         require(_ReportType == 1 || _ReportType == 2 || _ReportType == 3 || _ReportType == 4 || _ReportType == 5, "Invalid report option.");
@@ -262,6 +292,7 @@ contract SocialMediaMain {
             ReportTrialInstance[ReportSessionNumber].PostNumberToReport = _NumberOfPostToReport;
             ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
             ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
+            ReportTrialInstance[ReportSessionNumber].ReportSeverity = _ReportSeverity;
 
         } else if (_ReportType == 2) { //For reporting accounts.
 
@@ -270,6 +301,7 @@ contract SocialMediaMain {
             ReportTrialInstance[ReportSessionNumber].AddressOfUserToReport = _AddressOfPersontoReport;
             ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
             ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
+            ReportTrialInstance[ReportSessionNumber].ReportSeverity = _ReportSeverity;
 
         } else if (_ReportType == 3) { //For reporting mods.
 
@@ -278,6 +310,7 @@ contract SocialMediaMain {
             ReportTrialInstance[ReportSessionNumber].AddressOfUserToReport = _AddressOfPersontoReport;
             ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
             ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
+            ReportTrialInstance[ReportSessionNumber].ReportSeverity = _ReportSeverity;
 
         } else if (_ReportType == 4) { //For reporting AltSuperuser.
 
@@ -286,10 +319,7 @@ contract SocialMediaMain {
             ReportTrialInstance[ReportSessionNumber].AddressOfUserToReport = _AddressOfPersontoReport;
             ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
             ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
-
-        }
-
-        function SuperUserControllPanel () public {
+            ReportTrialInstance[ReportSessionNumber].ReportSeverity = _ReportSeverity;
 
         }
     }
