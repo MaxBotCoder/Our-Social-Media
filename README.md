@@ -23,3 +23,6 @@ version 0.0.1.5 (Pre-Alpha) #Minor Update "Completed third part of report system
 
 version 0.0.1.6 (Pre-Alpha) #Minor Update "Creating appeals system for people reported."
 
+//// June 23RD 2025 ////
+
+version 0.0.1.7 (Pre-Alpha) #Minor Update "Appeals System partially completed."
