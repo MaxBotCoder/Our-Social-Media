@@ -22,9 +22,6 @@ contract SocialMediaMain {
     //Abuse of power failsafe.
     uint public constant MaximumBanningsPerWeek = 200; //Must be configured before deployement << FAILSAFE >> << UNCHANGEABLE >>
     uint public constant AltSuperUserTermLimits = 18; //Represents the number of weeks an Alt SuperUser can have power
-    
-    //Report Session Info
-    uint public ReportSessionNumber;
 
     //Moderation System Related Tasks.
     uint public constant MaxmiumStrikes = 10; //Maximum post reports untill cicked out. //Must be changed prior to deployment.
@@ -98,6 +95,8 @@ contract SocialMediaMain {
         uint ReportSeverity;
     }
 
+    uint public ReportSessionNumber;
+    mapping(uint => bool) ReportSessionNumberExists;
     mapping(uint => ReportTrial) public ReportTrialInstance;
     mapping(address => mapping(uint => bool)) public PersonalReport; //What a specific user voted.
     mapping(uint => uint) public ReportInteractionNumber; //Counts number of vote interactions within a report trial. (GENERAL)
@@ -113,17 +112,16 @@ contract SocialMediaMain {
 
     //Shows info related to votes.
     struct VotingSession {
-        string VoteTypeHumanReadable;
-        uint VoteType;
-        uint AddressOfUserToVote; //Only for reporting people.
-        uint PostNumberToVote; //Only for posts.
-        string VoteSubject;
-        string VoteDetails;
-        bool VoteVerdictReached; //Report verdict reached (Please look at this prior to virdict) false = Verdict not reached, true = Verdict reached.
+        address AddressOfUserToVote; //Only for voting people.
+        uint VoteSubject;
+        string VoteSubjectUserReadable;
+        bool VoteConclusionReached; //Report verdict reached (Please look at this prior to virdict) false = Verdict not reached, true = Verdict reached.
         bool VoteVerdictResult; //Report verdict true = Guilty, false = Innocent or verdict unreached. (Look at virdict reached first)
     }
 
-    mapping(uint => ReportTrial) public VotingSessionInstance;
+    uint public VotingSessionNumber;
+    mapping(uint => bool) VotingSessionNumberExists;
+    mapping(uint => VotingSession) public VotingSessionInstance;
     mapping(address => mapping(uint => bool)) public PersonalVote; //What a specific user voted.
     mapping(uint => uint) public VotingInteractionNumber; //Counts number of vote interactions within a report trial. (GENERAL)
     mapping(uint => mapping(bool => uint)) public NumberOfVotesInCatagory; //Counts number of votes (CATAGORY) within a report trial.
@@ -139,8 +137,12 @@ contract SocialMediaMain {
     //Ban appeal trial.
     struct BanAppealSession {
         string ReasonForBan;
-        
+        string AppealStatement;  
+        bool AppealSucessfull;      
     }
+
+    uint public BanAppealSessionNumber;
+    mapping(uint => BanAppealSession) public BanAppealInstance; //Specific ban appeal system instance.
 
     //Prepair contract info
     constructor(string memory _Handle, string memory _UserName, string memory _About) {
@@ -222,23 +224,6 @@ contract SocialMediaMain {
         require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
         require(ValidAccount[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
         PersonalPostNumbering[msg.sender][_PersonalPostNumber] = PostNumberToPost[PersonalPostNumberToGlobalPostNumber[_PersonalPostNumber]] = Post( AddressToHandle[msg.sender], AddressToUserName[msg.sender], _PostData, "All clear", PersonalPostNumber[msg.sender], PostNumber);
-    }
-
-    //For voting normally.
-    function VotingPollInteraction (uint _VoteType, uint _VoteSessionNumber, bool _CastVote) public {
-        require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
-        require(ValidAccount[msg.sender] == true || AltSuperUser[msg.sender] == true || Moderator[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
-        require(_VoteType == 1 || _VoteType == 2 || _VoteType == 3 , "Invalid voting option.");
-        
-        if(_VoteType == 1) { //Vote in moderator.
-
-
-
-        } else if (_VoteType == 2) { //Vote in ALT Super User.
-            
-        } else if (_VoteType == 3) { //Appeal Report
-
-        }
     }
 
     function ReportTrialVoting ( uint _ReportSessionNumber, bool _CastVote) public {
@@ -330,6 +315,7 @@ contract SocialMediaMain {
             ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
             ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
             ReportTrialInstance[ReportSessionNumber].ReportSeverity = _ReportSeverity;
+            ReportSessionNumberExists[ReportSessionNumber] = true;
 
             ReportTrialVoting( ReportSessionNumber, true);
 
@@ -341,6 +327,7 @@ contract SocialMediaMain {
             ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
             ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
             ReportTrialInstance[ReportSessionNumber].ReportSeverity = _ReportSeverity;
+            ReportSessionNumberExists[ReportSessionNumber] = true;
 
             ReportTrialVoting( ReportSessionNumber, true);
 
@@ -352,6 +339,7 @@ contract SocialMediaMain {
             ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
             ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
             ReportTrialInstance[ReportSessionNumber].ReportSeverity = _ReportSeverity;
+            ReportSessionNumberExists[ReportSessionNumber] = true;
 
             ReportTrialVoting( ReportSessionNumber, true);
 
@@ -363,15 +351,62 @@ contract SocialMediaMain {
             ReportTrialInstance[ReportSessionNumber].ReportSubject = _ReportSubject;
             ReportTrialInstance[ReportSessionNumber].ReportDetails = _ReportDetails;
             ReportTrialInstance[ReportSessionNumber].ReportSeverity = _ReportSeverity;
+            ReportSessionNumberExists[ReportSessionNumber] = true;
 
             ReportTrialVoting( ReportSessionNumber, true);
 
         }
     }
 
-    function AppealBan (uint _AppealJustification ,string memory _Message) public {
+    function BanAppeal (uint _BanIWishToAppeal , string memory _AppealJustification) public {
         require(Blacklisted[msg.sender] == true, "You're not blacklisted silly!");
+        BanAppealInstance[BanAppealSessionNumber++].ReasonForBan = ReportTrialInstance[_BanIWishToAppeal].ReportDetails;
+        BanAppealInstance[BanAppealSessionNumber].AppealStatement = _AppealJustification;
+    }
 
+    //Create vote proposal for people!
+       function ProposeVotingCandidate(uint _VoteType, address _PersonTopropose, string memory _WhatYouCanDo) public {
+        require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
+        require(ValidAccount[msg.sender] == true || AltSuperUser[msg.sender] == true || Moderator[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
+        require(_VoteType == 1 || _VoteType == 2 || _VoteType == 3 , "Invalid voting option.");
 
+        if (_VoteType == 1) { //Vote in moderator.
+            
+            VotingSessionInstance[VotingSessionNumber++].AddressOfUserToVote = _PersonTopropose;
+            VotingSessionInstance[VotingSessionNumber++].VoteSubject = _VoteType;
+            VotingSessionInstance[VotingSessionNumber++].VoteSubjectUserReadable = _WhatYouCanDo;
+
+        } else if (_VoteType == 2) { //Vote in ALT Super User.
+
+            VotingSessionInstance[VotingSessionNumber++].AddressOfUserToVote = _PersonTopropose;
+            VotingSessionInstance[VotingSessionNumber++].VoteSubject = _VoteType;
+            VotingSessionInstance[VotingSessionNumber++].VoteSubjectUserReadable = _WhatYouCanDo;
+
+        } else if (_VoteType == 3) { //Appeal Report
+
+            VotingSessionInstance[VotingSessionNumber++].AddressOfUserToVote = _PersonTopropose;
+            VotingSessionInstance[VotingSessionNumber++].VoteSubject = _VoteType;
+            VotingSessionInstance[VotingSessionNumber++].VoteSubjectUserReadable = _WhatYouCanDo;
+
+        }
+    }
+    
+ 
+    //For voting normally.
+    function VotingPollInteraction (uint _VoteType, uint _VoteSessionNumber, address _VoteFor) public {
+        require(Blacklisted[msg.sender] == false, "You have been blacklisted.");
+        require(ValidAccount[msg.sender] == true || AltSuperUser[msg.sender] == true || Moderator[msg.sender] == true, "We're sorry for the inconvenience, but only people with accounts are allowed to make posts.");
+        require(_VoteType == 1 || _VoteType == 2 || _VoteType == 3 , "Invalid voting option.");
+        require(_VoteFor != msg.sender, "You cannot vote yourself!");
+
+        if(_VoteType == 1) { //Vote in moderator.
+
+            
+
+        } else if (_VoteType == 2) { //Vote in ALT Super User.
+            
+        } else if (_VoteType == 3) { //Appeal Report
+
+        }
     }
 }
